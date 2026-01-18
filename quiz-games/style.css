@@ -1,0 +1,203 @@
+/* ---------- General Body ---------- */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #0D1424;
+  color: #ffffff;
+  margin: 0;
+  padding: 0;
+}
+
+.game-title {
+  text-align: center;
+  padding: 20px;
+  background: linear-gradient(90deg, #007BFF, #00D4FF);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.game-title h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+/* ---------- Container ---------- */
+.game-container {
+  display: flex;
+  padding: 20px;
+  gap: 20px;
+  height: calc(100vh - 80px);
+  box-sizing: border-box;
+}
+
+/* ---------- Main Card ---------- */
+.career-section {
+  flex: 2;
+  background-color: #1E2A44;
+  border-radius: 15px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+.card-title {
+  margin: 0 0 10px 0;
+  font-size: 20px;
+  color: #00D4FF;
+}
+
+/* ---------- Career + International Layout ---------- */
+.career-main {
+  display: flex;
+  gap: 20px;
+}
+
+/* Career Grid Container */
+.career-grid-container {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+}
+
+.career-grid-header {
+  display: flex;
+  gap: 10px;
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.career-col-title {
+  flex: 1;
+  min-width: 120px;
+  text-align: left;
+}
+
+.career-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.career-row {
+  display: flex;
+  gap: 10px;
+}
+
+.club-cell {
+  flex: 1;
+  min-width: 120px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background-color: #2A3A5A;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.3s, filter 0.3s;
+}
+
+.blurred {
+  filter: blur(5px);
+  color: transparent;
+  background-color: #394B70;
+}
+
+/* ---------- International Card ---------- */
+#intCard {
+  flex: 1;
+  background-color: #1E2A44;
+  border-radius: 12px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+#intCard div {
+  display: flex;
+  justify-content: space-between;
+}
+
+#intCard .value {
+  font-weight: bold;
+  color: #00D4FF;
+}
+
+/* ---------- Input & Buttons ---------- */
+.input-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+#guessInput {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  background-color: #2A3A5A;
+  color: #ffffff;
+}
+
+button {
+  padding: 8px 15px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  background-color: #00AFFF;
+  color: #ffffff;
+  transition: background 0.3s;
+}
+
+button:hover {
+  background-color: #008FD4;
+}
+
+/* Result Text */
+#result {
+  margin-top: 10px;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+}
+
+.sidebar-section {
+  background-color: #1E2A44;
+  border-radius: 12px;
+  padding: 15px;
+  flex: 1;
+  overflow-y: auto;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.sidebar-section h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #00D4FF;
+}
+
+.log-entry {
+  font-size: 13px;
+  margin-bottom: 3px;
+  color: #ffffff;
+}
+
+/* ---------- Removed Green Popups ---------- */
+.score-pop,
+.pop {
+  display: none;
+}
