@@ -93,8 +93,21 @@ def _position_values(value):
 def _position_proficiency(row, slot):
     values = row.get("Position Proficiency", {})
     if isinstance(values, dict):
-        return pd.to_numeric(values.get(slot), errors="coerce")
+        value = pd.to_numeric(values.get(slot), errors="coerce")
+        return float(value) if pd.notna(value) else 0.0
     return 15.0 if slot in _position_values(row.get("Positions")) else 0.0
+
+
+def _proficiency_multiplier(value):
+    if value >= 20:
+        return 1.0
+    if value >= 15:
+        return 0.95
+    if value >= 10:
+        return 0.75
+    if value >= 5:
+        return 0.5
+    return 0.0
 
 
 def _role_scores(candidates, slot):
@@ -118,28 +131,52 @@ def _choose_candidate(candidates, slot, mode):
         lambda row: _position_proficiency(row, slot),
         axis=1,
     ).fillna(0)
+    candidates["_position_multiplier"] = candidates["_position_proficiency"].map(_proficiency_multiplier)
+    candidates["_effective_score"] = candidates["_current_score"] * candidates["_position_multiplier"]
+    candidates["_effective_predicted_score"] = candidates["_predicted_score"] * candidates["_position_multiplier"]
     if mode == "current":
         return candidates.sort_values(
-            ["_current_score", "_position_proficiency", "Current Ability"],
+            ["_effective_score", "_position_proficiency", "Current Ability"],
             ascending=False,
         ).iloc[0]
     if mode == "potential":
         return candidates.sort_values(
-            ["_predicted_score", "_position_proficiency", "Potential Ability"],
+            ["_effective_predicted_score", "_position_proficiency", "Potential Ability"],
             ascending=False,
         ).iloc[0]
     current_pick = candidates.sort_values(
-        ["_current_score", "_position_proficiency", "Current Ability"],
+        ["_effective_score", "_position_proficiency", "Current Ability"],
         ascending=False,
     ).iloc[0]
-    near_current = candidates[candidates["_current_score"] >= current_pick["_current_score"] - 10]
-    upgrades = near_current[(near_current["_predicted_score"] > current_pick["_current_score"]) & (near_current["_predicted_score"] > current_pick["_predicted_score"])]
+    near_current = candidates[candidates["_effective_score"] >= current_pick["_effective_score"] - 10]
+    upgrades = near_current[
+        (near_current["_effective_predicted_score"] > current_pick["_effective_score"])
+        & (near_current["_effective_predicted_score"] > current_pick["_effective_predicted_score"])
+    ]
     if not upgrades.empty:
         return upgrades.sort_values(
-            ["_predicted_score", "_position_proficiency", "_current_score"],
+            ["_effective_predicted_score", "_position_proficiency", "_effective_score"],
             ascending=False,
         ).iloc[0]
     return current_pick
+
+
+def _fallback_candidate(candidates, slots):
+    if candidates.empty:
+        return None
+    proficiency = candidates.apply(
+        lambda row: max((_position_proficiency(row, slot) for slot in slots), default=0),
+        axis=1,
+    )
+    fallback = candidates[proficiency < 5].copy()
+    if fallback.empty:
+        return None
+    fallback["_fallback_rating"] = _number_series(fallback, "Current Rating")
+    fallback["_fallback_potential"] = _number_series(fallback, "Potential Rating")
+    return fallback.sort_values(
+        ["_fallback_rating", "_fallback_potential", "Current Ability"],
+        ascending=False,
+    ).iloc[0]
 
 
 def _build_squads(raw, club, formation):
@@ -165,10 +202,14 @@ def _build_squads(raw, club, formation):
         for slot_index, slot in enumerate(slots):
             position_label = labels[slot_index]
             candidates = df[~df.index.isin(used)].copy()
-            candidates = candidates[candidates["Positions"].map(lambda value: slot in _position_values(value))]
+            candidates = candidates[
+                candidates.apply(lambda row: _position_proficiency(row, slot) >= 5, axis=1)
+            ]
             if age_limit is not None and "Age" in candidates:
                 candidates = candidates[_number_series(candidates, "Age", 999) <= age_limit]
             pick = _choose_candidate(candidates, slot, mode)
+            if pick is None:
+                pick = _fallback_candidate(candidates, slots)
             if pick is None:
                 rows.append({"Team": team, "Role": squad_role, "Position": position_label, "Player": "No suitable player", "Rating": "—", "Projected": "—", "CA": "—", "PA": "—"})
                 continue
