@@ -16,6 +16,7 @@ _HISTORY_CACHE_KEY = None
 _HISTORY_CACHE = None
 _EXPORT_CACHE_KEY = None
 _EXPORT_CACHE = None
+_SNAPSHOT_CACHE: dict[tuple[str, int, int], pd.DataFrame] = {}
 
 SCHEDULED_MONTHS = {1, 4, 7, 10}
 
@@ -143,6 +144,11 @@ def _enrich_current_fields(df: pd.DataFrame) -> pd.DataFrame:
 
 def load_snapshot(source: str | Path) -> pd.DataFrame:
     path = Path(source)
+    stat = path.stat()
+    cache_key = (str(path), stat.st_mtime_ns, stat.st_size)
+    cached = _SNAPSHOT_CACHE.get(cache_key)
+    if cached is not None:
+        return cached.copy()
     df = _read_file(path).copy()
     aliases = {"CA": "Current Ability", "PA": "Potential Ability", "UID": "ID", "Club Name": "Club", "Prof": "Professionalism"}
     attribute_aliases = {value: key for key, value in ATTRIBUTE_ALIASES.items()}
@@ -159,7 +165,11 @@ def load_snapshot(source: str | Path) -> pd.DataFrame:
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
     df = _enrich_current_fields(df)
     df = _calculate_age(df)
-    return add_metrics(df)
+    enriched = add_metrics(df)
+    _SNAPSHOT_CACHE[cache_key] = enriched
+    if len(_SNAPSHOT_CACHE) > 8:
+        del _SNAPSHOT_CACHE[next(iter(_SNAPSHOT_CACHE))]
+    return enriched.copy()
 
 
 def add_metrics(df: pd.DataFrame) -> pd.DataFrame:
@@ -226,11 +236,15 @@ def load_history(include_current: bool = True) -> list[tuple[Path, pd.DataFrame]
     if signature == _HISTORY_CACHE_KEY and _HISTORY_CACHE is not None:
         return [(path, frame.copy()) for path, frame in _HISTORY_CACHE]
     entries = []
+    current_date = _raw_snapshot_date(SNAPSHOT_DIR / "fm24-memory.json") if include_current else pd.NaT
     for path in files:
         # Most archives are interim captures. Read their lightweight date
         # metadata first, and only run the full dataframe enrichment for a
         # scheduled archive that belongs in the development history.
-        if _is_scheduled_snapshot_date(_raw_snapshot_date(path)):
+        path_date = _raw_snapshot_date(path)
+        if _is_scheduled_snapshot_date(path_date) and (
+            pd.isna(current_date) or pd.isna(path_date) or path_date.normalize() != current_date.normalize()
+        ):
             entries.append((path, load_snapshot(path)))
     latest_path = SNAPSHOT_DIR / "fm24-memory.json"
     if include_current and latest_path.exists():

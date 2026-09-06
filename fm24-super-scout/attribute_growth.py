@@ -92,26 +92,64 @@ def _transition_rows(history: list[pd.DataFrame]) -> list[tuple[pd.Series, pd.Se
 
 
 def _fit_models(history: list[pd.DataFrame]) -> dict[str, np.ndarray]:
-    rows = _transition_rows(history)
+    dated = []
+    for frame in history:
+        if "Date" not in frame or "ID" not in frame:
+            continue
+        dates = pd.to_datetime(frame["Date"], errors="coerce").dropna()
+        if not dates.empty:
+            dated.append((dates.min(), frame))
+    dated.sort(key=lambda item: item[0])
     club_effects = _club_development_effects(history)
+    transitions = []
+    for (old_date, old), (new_date, new) in zip(dated, dated[1:]):
+        years = (new_date - old_date).days / 365.25
+        if years <= 0:
+            continue
+        old_columns = [
+            column for column in [
+                "ID", "Club", "Age", "Professionalism", "Potential Ability",
+                "Current Ability", "Current Rating", "Positions", *PREDICTED_ATTRIBUTES
+            ] if column in old
+        ]
+        new_columns = ["ID", *PREDICTED_ATTRIBUTES]
+        merged = old[old_columns].drop_duplicates("ID").merge(
+            new[new_columns].drop_duplicates("ID"),
+            on="ID",
+            how="inner",
+            suffixes=("_old", "_new"),
+        )
+        if not merged.empty:
+            old_frame = merged.rename(columns={
+                f"{column}_old": column
+                for column in old_columns
+                if f"{column}_old" in merged
+            })
+            transitions.append((old_frame, merged, years))
     models = {}
     for attribute in PREDICTED_ATTRIBUTES:
         design, target = [], []
-        for old, new, years in rows:
-            old_value = _numeric(old, attribute, np.nan)
-            new_value = _numeric(new, attribute, np.nan)
-            if not np.isfinite(old_value) or not np.isfinite(new_value):
+        for old, merged, years in transitions:
+            old_values = pd.to_numeric(
+                old.get(attribute, pd.Series(np.nan, index=old.index)),
+                errors="coerce",
+            )
+            new_values = pd.to_numeric(
+                merged.get(f"{attribute}_new", pd.Series(np.nan, index=merged.index)),
+                errors="coerce",
+            )
+            valid = old_values.notna() & new_values.notna()
+            if not valid.any():
                 continue
-            old = old.copy()
-            old["Club Development Effect"] = club_effects.get(str(old.get("Club", "")), 0.0)
-            features = _features(old)
-            features[4] = old_value / 20.0
-            design.append([1.0, *features])
-            target.append((new_value - old_value) / years)
+            old_valid = old.loc[valid].copy()
+            base = _feature_matrix(old_valid, club_effects)
+            base[:, 5] = old_values.loc[valid].to_numpy() / 20.0
+            design.append(base)
+            target.append(((new_values.loc[valid] - old_values.loc[valid]) / years).to_numpy())
         if len(target) < MIN_TRAINING_ROWS:
             continue
-        x = np.asarray(design, dtype=float)
-        y = np.asarray(target, dtype=float)
+        x = np.concatenate(design)
+        y = np.concatenate(target)
         penalty = np.eye(x.shape[1], dtype=float) * 2.0
         penalty[0, 0] = 0.0
         beta = np.linalg.solve(x.T @ x + penalty, x.T @ y)

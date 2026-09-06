@@ -1,4 +1,6 @@
 from pathlib import Path
+from functools import lru_cache
+from io import StringIO
 import pandas as pd
 import dash
 from dash import Dash, dcc, html, dash_table, Input, Output, State
@@ -6,6 +8,11 @@ from dash import Dash, dcc, html, dash_table, Input, Output, State
 from config import POSITION_ORDER, SNAPSHOT_DIR
 from scout import load_latest, load_history, load_snapshot, growth, save_shortlist
 from attribute_growth import PREDICTED_ATTRIBUTES
+
+
+@lru_cache(maxsize=2)
+def _dataframe_from_json(raw: str) -> pd.DataFrame:
+    return pd.read_json(StringIO(raw), orient="records")
 
 FORMATION_POSITIONS = {
     "4-4-2": ["GK", "DL", "DC", "DC", "DR", "ML", "MC", "MC", "MR", "ST", "ST"],
@@ -38,7 +45,7 @@ DEVELOPMENT_METRICS = [
 
 
 def _best_xi(raw, club, formation):
-    df = pd.read_json(raw, orient="records") if raw else pd.DataFrame()
+    df = _dataframe_from_json(raw) if raw else pd.DataFrame()
     if df.empty or not club or formation not in FORMATION_POSITIONS:
         return []
     df = df[df["Club"].astype(str) == club].copy()
@@ -113,7 +120,7 @@ def _choose_candidate(candidates, slot, mode):
 
 
 def _build_squads(raw, club, formation):
-    df = pd.read_json(raw, orient="records") if raw else pd.DataFrame()
+    df = _dataframe_from_json(raw) if raw else pd.DataFrame()
     if df.empty or not club or formation not in FORMATION_POSITIONS or "Club" not in df:
         return []
     df = df[df["Club"].astype(str) == club].copy()
@@ -224,7 +231,7 @@ def update_status(raw):
 
 @app.callback(Output("players", "data"), Output("players", "columns"), Output("players", "page_count"), Input("data", "data"), Input("player-query", "value"), Input("club-query", "value"), Input("position", "value"), Input("min-ca", "value"), Input("min-pa", "value"), Input("players", "page_current"), Input("players", "page_size"), Input("players", "sort_by"))
 def update_table(raw, player_query, club_query, position, min_ca, min_pa, page_current, page_size, sort_by):
-    df = pd.read_json(raw, orient="records") if raw else pd.DataFrame()
+    df = _dataframe_from_json(raw).copy() if raw else pd.DataFrame()
     if df.empty:
         return [], [], 0
     if player_query:
@@ -263,7 +270,7 @@ def shortlist(_, rows):
 
 @app.callback(Output("team", "options"), Output("xi-table", "data"), Output("xi-summary", "children"), Input("data", "data"), Input("team", "value"), Input("formation", "value"))
 def update_xi(raw, club, formation):
-    df = pd.read_json(raw, orient="records") if raw else pd.DataFrame()
+    df = _dataframe_from_json(raw) if raw else pd.DataFrame()
     clubs = sorted(x for x in df.get("Club", pd.Series(dtype=str)).dropna().astype(str).unique() if x not in {"Unknown", "Free Transfer"})
     options = [{"label": x, "value": x} for x in clubs]
     rows = _build_squads(raw, club, formation)
@@ -277,7 +284,7 @@ def update_xi(raw, club, formation):
 
 @app.callback(Output("development-player", "options"), Output("development-player", "value"), Output("development-chart", "figure"), Output("development-table", "data"), Output("development-summary", "children"), Input("data", "data"), Input("development-player", "value"), Input("development-metric", "value"))
 def update_development(raw, player_id, metric):
-    current = pd.read_json(raw, orient="records") if raw else pd.DataFrame()
+    current = _dataframe_from_json(raw) if raw else pd.DataFrame()
     history = load_history()
     if current.empty:
         return [], None, {"data": [], "layout": {"paper_bgcolor": "#111a23", "plot_bgcolor": "#111a23"}}, [], "No snapshots available."
