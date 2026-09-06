@@ -90,6 +90,13 @@ def _position_values(value):
     return str(value or "").replace(",", " ").split()
 
 
+def _position_proficiency(row, slot):
+    values = row.get("Position Proficiency", {})
+    if isinstance(values, dict):
+        return pd.to_numeric(values.get(slot), errors="coerce")
+    return 15.0 if slot in _position_values(row.get("Positions")) else 0.0
+
+
 def _role_scores(candidates, slot):
     current = _number_series(candidates, f"{slot}_rating")
     if f"{slot}_rating" not in candidates:
@@ -107,15 +114,31 @@ def _choose_candidate(candidates, slot, mode):
     candidates = candidates.copy()
     candidates["_current_score"] = current
     candidates["_predicted_score"] = predicted
+    candidates["_position_proficiency"] = candidates.apply(
+        lambda row: _position_proficiency(row, slot),
+        axis=1,
+    ).fillna(0)
     if mode == "current":
-        return candidates.sort_values(["_current_score", "Current Ability"], ascending=False).iloc[0]
+        return candidates.sort_values(
+            ["_current_score", "_position_proficiency", "Current Ability"],
+            ascending=False,
+        ).iloc[0]
     if mode == "potential":
-        return candidates.sort_values(["_predicted_score", "Potential Ability"], ascending=False).iloc[0]
-    current_pick = candidates.sort_values(["_current_score", "Current Ability"], ascending=False).iloc[0]
+        return candidates.sort_values(
+            ["_predicted_score", "_position_proficiency", "Potential Ability"],
+            ascending=False,
+        ).iloc[0]
+    current_pick = candidates.sort_values(
+        ["_current_score", "_position_proficiency", "Current Ability"],
+        ascending=False,
+    ).iloc[0]
     near_current = candidates[candidates["_current_score"] >= current_pick["_current_score"] - 10]
     upgrades = near_current[(near_current["_predicted_score"] > current_pick["_current_score"]) & (near_current["_predicted_score"] > current_pick["_predicted_score"])]
     if not upgrades.empty:
-        return upgrades.sort_values(["_predicted_score", "_current_score"], ascending=False).iloc[0]
+        return upgrades.sort_values(
+            ["_predicted_score", "_position_proficiency", "_current_score"],
+            ascending=False,
+        ).iloc[0]
     return current_pick
 
 

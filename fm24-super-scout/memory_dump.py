@@ -406,10 +406,16 @@ def dump(pid: int, output: Path, debug_id: int | None = None, game_date: str | N
             if not attrs: continue
             positions = process.read(plao + 0x208, 15) or b""
             dob = _person_dob(process, person)
+            position_proficiency = {
+                POSITIONS[i]: int(value)
+                for i, value in enumerate(positions)
+            }
             row = {"ID": process.u32(person + 0x0C), "Name": _person_name(process, person), "DoB": dob,
                    "Club": _club_name(process, person),
                    "Current Ability": process.u16(plao + 0x200), "Potential Ability": process.u16(plao + 0x202),
-                   "Positions": [POSITIONS[i] for i, value in enumerate(positions) if value >= 15], "Source": "FM24 memory 24.4.2"}
+                   "Position Proficiency": position_proficiency,
+                   "Positions": [position for position, value in position_proficiency.items() if value >= 15],
+                   "Source": "FM24 memory 24.4.2"}
             row.update({key: attrs[pos] // 5 for key, pos in ATTRS.items()})
             personality = process.read(person + 0x78, len(PERSONALITY_FIELDS)) or b""
             row.update({name: personality[index] for index, name in enumerate(PERSONALITY_FIELDS) if index < len(personality) and personality[index] > 0})
