@@ -130,20 +130,27 @@ def _build_squads(raw, club, formation):
     labels = FORMATION_LABELS.get(formation, slots)
     used = set()
     rows = []
-    for team, mode, age_limit in TEAM_SPECS:
+    assignments = [
+        (TEAM_SPECS[0][0], TEAM_SPECS[0][1], TEAM_SPECS[0][2], squad_role)
+        for squad_role in ("Starter", "Backup")
+    ] + [
+        (team, mode, age_limit, squad_role)
+        for squad_role in ("Starter", "Backup")
+        for team, mode, age_limit in TEAM_SPECS[1:]
+    ]
+    for team, mode, age_limit, squad_role in assignments:
         for slot_index, slot in enumerate(slots):
             position_label = labels[slot_index]
-            for squad_role in ("Starter", "Backup"):
-                candidates = df[~df.index.isin(used)].copy()
-                candidates = candidates[candidates["Positions"].map(lambda value: slot in _position_values(value))]
-                if age_limit is not None and "Age" in candidates:
-                    candidates = candidates[_number_series(candidates, "Age", 999) <= age_limit]
-                pick = _choose_candidate(candidates, slot, mode)
-                if pick is None:
-                    rows.append({"Team": team, "Role": squad_role, "Position": position_label, "Player": "No suitable player", "Rating": "—", "Projected": "—", "CA": "—", "PA": "—"})
-                    continue
-                used.add(pick.name)
-                rows.append({"Team": team, "Role": squad_role, "Position": position_label, "Player": pick.get("Name", "Unknown"), "Rating": round(float(pick["_current_score"]), 1), "Projected": round(float(pick["_predicted_score"]), 1), "CA": int(pick["Current Ability"]) if pd.notna(pick.get("Current Ability")) else "—", "PA": int(pick["Potential Ability"]) if pd.notna(pick.get("Potential Ability")) else "—"})
+            candidates = df[~df.index.isin(used)].copy()
+            candidates = candidates[candidates["Positions"].map(lambda value: slot in _position_values(value))]
+            if age_limit is not None and "Age" in candidates:
+                candidates = candidates[_number_series(candidates, "Age", 999) <= age_limit]
+            pick = _choose_candidate(candidates, slot, mode)
+            if pick is None:
+                rows.append({"Team": team, "Role": squad_role, "Position": position_label, "Player": "No suitable player", "Rating": "—", "Projected": "—", "CA": "—", "PA": "—"})
+                continue
+            used.add(pick.name)
+            rows.append({"Team": team, "Role": squad_role, "Position": position_label, "Player": pick.get("Name", "Unknown"), "Rating": round(float(pick["_current_score"]), 1), "Projected": round(float(pick["_predicted_score"]), 1), "CA": int(pick["Current Ability"]) if pd.notna(pick.get("Current Ability")) else "—", "PA": int(pick["Potential Ability"]) if pd.notna(pick.get("Potential Ability")) else "—"})
     return rows
 
 
