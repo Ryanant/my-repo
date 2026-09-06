@@ -110,6 +110,14 @@ def _proficiency_multiplier(value):
     return 0.0
 
 
+def _weighted_rating(rating, multiplier):
+    if multiplier <= 0:
+        return float("-inf")
+    if rating < 0:
+        return rating / multiplier
+    return rating * multiplier
+
+
 def _role_scores(candidates, slot):
     current = _number_series(candidates, f"{slot}_rating")
     if f"{slot}_rating" not in candidates:
@@ -132,20 +140,26 @@ def _choose_candidate(candidates, slot, mode):
         axis=1,
     ).fillna(0)
     candidates["_position_multiplier"] = candidates["_position_proficiency"].map(_proficiency_multiplier)
-    candidates["_effective_score"] = candidates["_current_score"] * candidates["_position_multiplier"]
-    candidates["_effective_predicted_score"] = candidates["_predicted_score"] * candidates["_position_multiplier"]
+    candidates["_effective_score"] = candidates.apply(
+        lambda row: _weighted_rating(row["_current_score"], row["_position_multiplier"]),
+        axis=1,
+    )
+    candidates["_effective_predicted_score"] = candidates.apply(
+        lambda row: _weighted_rating(row["_predicted_score"], row["_position_multiplier"]),
+        axis=1,
+    )
     if mode == "current":
         return candidates.sort_values(
-            ["_effective_score", "_position_proficiency", "Current Ability"],
+            ["_position_proficiency", "_effective_score", "Current Ability"],
             ascending=False,
         ).iloc[0]
     if mode == "potential":
         return candidates.sort_values(
-            ["_effective_predicted_score", "_position_proficiency", "Potential Ability"],
+            ["_position_proficiency", "_effective_predicted_score", "Potential Ability"],
             ascending=False,
         ).iloc[0]
     current_pick = candidates.sort_values(
-        ["_effective_score", "_position_proficiency", "Current Ability"],
+        ["_position_proficiency", "_effective_score", "Current Ability"],
         ascending=False,
     ).iloc[0]
     near_current = candidates[candidates["_effective_score"] >= current_pick["_effective_score"] - 10]
