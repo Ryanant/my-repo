@@ -197,26 +197,29 @@ development_content = html.Div([
 app.layout = html.Div([
     html.Div([html.Div([html.Div("FM24", className="eyebrow"), html.H1("Super Scout"), html.P("Live player intelligence for Football Manager 2024.")]),
               html.Div([html.Div("READ-ONLY", className="live-pill"), dcc.Upload(id="upload", children=html.Button("Import data", className="secondary"))], className="header-actions")], className="header"),
-    html.Div([html.Div("Loading snapshot, calculating ratings and building forecasts…", className="loading-status"), html.Div(className="progress-track", children=html.Div(className="progress-fill"))], id="status", className="status"),
+    html.Div([html.Div("Loading snapshot, calculating ratings and building forecasts…", id="status-text", className="loading-status"), html.Div(className="progress-track", children=html.Div(className="progress-fill"))], id="status", className="status"),
     dcc.Tabs(id="tabs", value="search", className="tabs", children=[dcc.Tab(label="Player Search", value="search", children=search_content), dcc.Tab(label="Best XI Builder", value="xi", children=xi_content), dcc.Tab(label="Development", value="development", children=development_content)]),
     dcc.Store(id="data", data=None),
-    dcc.Interval(id="refresh-timer", interval=10000, n_intervals=0),
 ], className="page")
 
 
-@app.callback(Output("data", "data"), Output("status", "children"), Input("upload", "contents"), Input("refresh-timer", "n_intervals"), State("upload", "filename"))
-def import_file(contents, _refresh_count, filename):
-    if dash.ctx.triggered_id != "upload" or not contents or not filename:
-        if dash.ctx.triggered_id == "refresh-timer":
-            # Avoid serializing and sending the full player database every
-            # ten seconds when the hotkey has not produced a new snapshot.
-            return dash.no_update, dash.no_update
-        latest = load_latest()
-    return latest.to_json(orient="records", date_format="iso"), "Ready — latest memory snapshot and forecasts loaded"
-    import base64
-    target = SNAPSHOT_DIR / Path(filename).name
-    target.write_bytes(base64.b64decode(contents.split(",", 1)[1]))
-    return load_snapshot(target).to_json(orient="records", date_format="iso"), f"Loaded {filename}"
+@app.callback(Output("data", "data"), Input("upload", "contents"), State("upload", "filename"))
+def import_file(contents, filename):
+    if dash.ctx.triggered_id == "upload" and contents and filename:
+        import base64
+        target = SNAPSHOT_DIR / Path(filename).name
+        target.write_bytes(base64.b64decode(contents.split(",", 1)[1]))
+        loaded = load_snapshot(target)
+        return loaded.to_json(orient="records", date_format="iso")
+    latest = load_latest()
+    return latest.to_json(orient="records", date_format="iso")
+
+
+@app.callback(Output("status-text", "children"), Input("data", "data"))
+def update_status(raw):
+    if not raw:
+        return "Loading snapshot, calculating ratings and building forecasts…"
+    return "Ready — latest memory snapshot and forecasts loaded"
 
 
 @app.callback(Output("players", "data"), Output("players", "columns"), Output("players", "page_count"), Input("data", "data"), Input("player-query", "value"), Input("club-query", "value"), Input("position", "value"), Input("min-ca", "value"), Input("min-pa", "value"), Input("players", "page_current"), Input("players", "page_size"), Input("players", "sort_by"))
