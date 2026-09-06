@@ -45,6 +45,30 @@ def _features(row: pd.Series) -> list[float]:
     ]
 
 
+def _feature_matrix(df: pd.DataFrame, club_effects: dict[str, float]) -> np.ndarray:
+    age = pd.to_numeric(df.get("Age", pd.Series(25.0, index=df.index)), errors="coerce").fillna(25.0)
+    professionalism = pd.to_numeric(df.get("Professionalism", pd.Series(10.0, index=df.index)), errors="coerce").fillna(10.0)
+    pa = pd.to_numeric(df.get("Potential Ability", pd.Series(0.0, index=df.index)), errors="coerce")
+    ca = pd.to_numeric(df.get("Current Ability", pd.Series(0.0, index=df.index)), errors="coerce")
+    rating = pd.to_numeric(df.get("Current Rating", pd.Series(0.0, index=df.index)), errors="coerce").fillna(0.0)
+    positions = df.get("Positions", pd.Series([[] for _ in df.index], dtype=object, index=df.index))
+    goalkeeper = positions.map(lambda value: "GK" in value if isinstance(value, (list, tuple, set)) else False)
+    clubs = df.get("Club", pd.Series("", index=df.index)).astype(str)
+    club_effect = clubs.map(club_effects).fillna(0.0)
+    age_scaled = age / 25.0
+    return np.column_stack([
+        np.ones(len(df)),
+        age_scaled,
+        age_scaled ** 2,
+        professionalism / 20.0,
+        (pa - ca).clip(lower=0).fillna(0.0) / 200.0,
+        np.zeros(len(df)),
+        rating / 100.0,
+        goalkeeper.to_numpy(dtype=float),
+        club_effect.to_numpy(),
+    ])
+
+
 def _transition_rows(history: list[pd.DataFrame]) -> list[tuple[pd.Series, pd.Series, float]]:
     dated = []
     for frame in history:
@@ -102,18 +126,14 @@ def add_attribute_predictions(df: pd.DataFrame, history: list[pd.DataFrame] | No
     models = _fit_models(history)
     club_effects = _club_development_effects(history)
     trained = len(models)
+    design = _feature_matrix(out, club_effects)
     for attribute in PREDICTED_ATTRIBUTES:
         current = pd.to_numeric(out.get(attribute, pd.Series(np.nan, index=out.index)), errors="coerce")
         growth = pd.Series(0.0, index=out.index)
         if attribute in models:
-            design = []
-            for index, row in out.iterrows():
-                row = row.copy()
-                row["Club Development Effect"] = club_effects.get(str(row.get("Club", "")), 0.0)
-                features = _features(row)
-                features[4] = (current.loc[index] / 20.0) if pd.notna(current.loc[index]) else 0.0
-                design.append([1.0, *features])
-            growth = pd.Series(np.asarray(design) @ models[attribute] * horizon_years, index=out.index).clip(-3.0, 3.0).round(2)
+            prediction_design = design.copy()
+            prediction_design[:, 5] = current.fillna(0.0).to_numpy() / 20.0
+            growth = pd.Series(prediction_design @ models[attribute] * horizon_years, index=out.index).clip(-3.0, 3.0).round(2)
         out[f"{attribute}_1y_growth"] = growth.where(current.notna())
         out[f"{attribute}_1y_pred"] = (current + growth).clip(1, 20).round(2)
     out["Attribute Models Trained"] = trained
