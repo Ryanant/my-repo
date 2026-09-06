@@ -1,0 +1,22 @@
+{
+  "field": "UID",
+  "value_type": "int",
+  "process_name": "fm.exe",
+  "pid": 29388,
+  "candidate_file": "C:\\Users\\jackj\\Documents\\Python Scripts\\my-repo\\fm-project\\memory\\scans\\uid_scan.bin",
+  "candidate_count": 10,
+  "last_value": 37052843,
+  "updated_at": "2026-09-04T21:59:13",
+  "sample": [
+    "0x78da7b0",
+    "0x78da838",
+    "0x78da8cc",
+    "0x78dab60",
+    "0x78dabe8",
+    "0x78dac7c",
+    "0x78db5c0",
+    "0x78db600",
+    "0x78db608",
+    "0x14642d890"
+  ]
+}

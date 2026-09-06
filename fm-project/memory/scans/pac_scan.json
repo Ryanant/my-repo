@@ -1,0 +1,32 @@
+{
+  "field": "Pac",
+  "value_type": "byte",
+  "process_name": "fm.exe",
+  "pid": 29388,
+  "candidate_file": "C:\\Users\\jackj\\Documents\\Python Scripts\\my-repo\\fm-project\\memory\\scans\\pac_scan.bin",
+  "candidate_count": 84,
+  "last_value": 20,
+  "updated_at": "2026-09-04T21:58:00",
+  "sample": [
+    "0x64c5cb7",
+    "0x64c5cb9",
+    "0x64c5cbd",
+    "0x64c5cc1",
+    "0x64c5cc3",
+    "0x64c5cc5",
+    "0x64c5cc7",
+    "0x64c5cc9",
+    "0x64c5ccb",
+    "0x64c5ccd",
+    "0x64c5ccf",
+    "0x64c5cd1",
+    "0x64c5cd3",
+    "0x64c5cd5",
+    "0x64c5cd7",
+    "0x64c5cd9",
+    "0x64c5cdb",
+    "0x64c5cdd",
+    "0x64c5cdf",
+    "0x64c5ce1"
+  ]
+}

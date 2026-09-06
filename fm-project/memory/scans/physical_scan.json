@@ -1,0 +1,20 @@
+{
+  "field": "physical",
+  "scan_type": "byte_sequence",
+  "process_name": "fm.exe",
+  "pid": 19108,
+  "candidate_file": "C:\\Users\\jackj\\Documents\\Python Scripts\\my-repo\\fm-project\\memory\\scans\\physical_scan.bin",
+  "candidate_count": 0,
+  "pattern": [
+    16,
+    14,
+    14,
+    12,
+    14,
+    17,
+    12,
+    13
+  ],
+  "updated_at": "2026-07-12T02:08:47",
+  "sample": []
+}

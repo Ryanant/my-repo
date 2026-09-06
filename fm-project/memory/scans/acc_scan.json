@@ -1,0 +1,14 @@
+{
+  "field": "Acc",
+  "value_type": "byte",
+  "process_name": "fm.exe",
+  "pid": 29388,
+  "candidate_file": "C:\\Users\\jackj\\Documents\\Python Scripts\\my-repo\\fm-project\\memory\\scans\\acc_scan.bin",
+  "candidate_count": 2,
+  "last_value": 10,
+  "updated_at": "2026-09-04T21:51:43",
+  "sample": [
+    "0x9b6534a8",
+    "0x9b94364a"
+  ]
+}
