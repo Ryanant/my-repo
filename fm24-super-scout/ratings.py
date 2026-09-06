@@ -13,6 +13,18 @@ def _values(df: pd.DataFrame, name: str) -> pd.Series:
     return pd.to_numeric(df[name], errors="coerce").fillna(0) if name in df else pd.Series(0.0, index=df.index)
 
 
+def _can_play(df: pd.DataFrame, position: str) -> pd.Series:
+    if "Position Proficiency" in df:
+        return df["Position Proficiency"].map(
+            lambda values: pd.to_numeric(values.get(position), errors="coerce") >= 5
+            if isinstance(values, dict)
+            else False
+        )
+    return df["Positions"].map(
+        lambda values: position in (values if isinstance(values, list) else [])
+    )
+
+
 def add_ratings(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     positions = out["Positions"]
@@ -21,7 +33,7 @@ def add_ratings(df: pd.DataFrame) -> pd.DataFrame:
     for attr, weight in GK_WEIGHTS.items():
         gk += _values(out, attr).clip(0, 20) * weight
     gk = (gk / max_gk * 100).round(2)
-    out["GK_rating"] = gk.where(positions.map(lambda value: "GK" in (value if isinstance(value, list) else [])))
+    out["GK_rating"] = gk.where(_can_play(out, "GK"))
 
     outfield = pd.Series(0.0, index=out.index)
     deficits = pd.Series(0.0, index=out.index)
@@ -31,7 +43,7 @@ def add_ratings(df: pd.DataFrame) -> pd.DataFrame:
         outfield += delta.clip(lower=0)
     outfield = outfield.where(deficits.eq(0), -deficits).round(2)
     for position in OUTFIELD_POSITIONS:
-        out[f"{position}_rating"] = outfield.where(positions.map(lambda value, p=position: p in (value if isinstance(value, list) else [])))
+        out[f"{position}_rating"] = outfield.where(_can_play(out, position))
 
     rating_cols = ["GK_rating", *[f"{position}_rating" for position in OUTFIELD_POSITIONS]]
     numeric = out[rating_cols].apply(pd.to_numeric, errors="coerce")
