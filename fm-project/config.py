@@ -3,7 +3,7 @@ import pandas as pd
 # -----------------------------
 # Paths
 PYTHON_EXPORTS = "C:/Users/jackj/Documents/Sports Interactive/Football Manager 2024/Python Exports"
-CURRENT_SAVE = "Everton"
+CURRENT_SAVE = "Portsmouth"
 ALL_PLAYERS_FILE = "all_players_data.csv"
 
 # -----------------------------

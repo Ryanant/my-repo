@@ -221,7 +221,7 @@ def load_latest() -> pd.DataFrame:
     latest = add_attribute_predictions(latest, dated_history)
     latest = add_projection_metrics(latest, projection_history)
     _LATEST_CACHE_KEY = signature
-    _LATEST_CACHE = growth(latest, previous)
+    _LATEST_CACHE = growth(latest, previous, dated_history)
     return _LATEST_CACHE.copy()
 
 
@@ -284,14 +284,36 @@ def _is_scheduled_snapshot_date(date) -> bool:
     return date.day == 1 and date.month in SCHEDULED_MONTHS
 
 
-def growth(df: pd.DataFrame, previous: pd.DataFrame | None) -> pd.DataFrame:
+def growth(
+    df: pd.DataFrame,
+    previous: pd.DataFrame | None,
+    history: list[pd.DataFrame] | None = None,
+) -> pd.DataFrame:
     out = df.copy()
-    if previous is None or previous.empty or "Current Ability" not in out or "Current Ability" not in previous:
+    history = history or []
+    first_records = []
+    for frame in history:
+        required = {"ID", "Current Ability"}
+        if not required.issubset(frame.columns):
+            continue
+        records = frame[["ID", "Current Ability"]].copy()
+        if "Date" in frame:
+            records["_date"] = pd.to_datetime(frame["Date"], errors="coerce")
+        else:
+            records["_date"] = pd.NaT
+        first_records.append(records)
+    if first_records:
+        first = pd.concat(first_records, ignore_index=True)
+        first["_date"] = first["_date"].fillna(pd.Timestamp.max)
+        first = first.sort_values("_date").drop_duplicates("ID")
+        old = first.set_index("ID")["Current Ability"]
+    elif previous is not None and not previous.empty and "Current Ability" in previous:
+        old = previous[["ID", "Current Ability"]].drop_duplicates("ID").set_index("ID")["Current Ability"]
+    else:
         out["CA Growth"] = 0.0
         out["CA Increase"] = 0.0
         out["Rating Increase"] = 0.0
         return out
-    old = previous[["ID", "Current Ability"]].drop_duplicates("ID").set_index("ID")["Current Ability"]
     out["CA Growth"] = (out["Current Ability"] - out["ID"].map(old)).fillna(0).round(2)
     out["CA Increase"] = out["CA Growth"]
     if "Current Rating" in out and "Current Rating" in previous:
