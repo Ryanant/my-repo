@@ -712,6 +712,7 @@ def _key_stat_columns(position: str) -> list[str]:
 def _key_stat_growth_for_uid(
     uid,
     position: str,
+    growth_period: str = "12m",
 ) -> int | None:
 
     player_history = (
@@ -726,7 +727,10 @@ def _key_stat_growth_for_uid(
 
     latest_row = player_history.iloc[-1]
 
-    previous_row = player_history.iloc[-2]
+    if growth_period == "all_time":
+        previous_row = player_history.iloc[0]
+    else:
+        previous_row = player_history.iloc[-2]
 
     attrs = [
         attr
@@ -771,6 +775,7 @@ def _build_rating_rows(
     squad: str,
     position: str,
     selected_players: list | None = None,
+    growth_period: str = "12m",
 ) -> list[dict]:
 
     if (
@@ -975,6 +980,7 @@ def _build_rating_rows(
         lambda row: _key_stat_growth_for_uid(
             row["UID"],
             row["Best_Position"],
+            growth_period,
         ),
         axis=1,
     )
@@ -1039,6 +1045,7 @@ def _build_age_key_stat_growth_rows(
     squad: str,
     position: str,
     selected_players: list | None = None,
+    growth_period: str = "12m",
 ) -> tuple[list[dict], list[dict]]:
     """
     Build ACTUAL attribute changes between consecutive
@@ -1196,6 +1203,10 @@ def _build_age_key_stat_growth_rows(
     if source.empty:
         return [], columns
 
+    growth_cutoff = None
+    if growth_period != "all_time":
+        growth_cutoff = source["Date"].max() - pd.DateOffset(months=12)
+
     # ---------------------------------------------------------
     # Sort by player and date
     #
@@ -1249,6 +1260,9 @@ def _build_age_key_stat_growth_rows(
             current = player_history.iloc[
                 idx
             ]
+
+            if growth_cutoff is not None and current["Date"] < growth_cutoff:
+                continue
 
             current_age = current.get(
                 "Age_int",
@@ -1621,38 +1635,56 @@ app.layout = dbc.Container(
                         _section(
                             "Ratings",
 
-                            dash_table.DataTable(
-                                id="ratings_table",
-
-                                columns=ONE_PAGE_COLUMNS,
-
-                                data=(
-                                    _build_rating_rows(
-                                        "all",
-                                        default_position,
-                                        [],
-                                    )
-                                    if default_position
-                                    else []
+                            [
+                                dcc.RadioItems(
+                                    id="ratings_growth_period",
+                                    options=[
+                                        {
+                                            "label": "Last 12 months",
+                                            "value": "12m",
+                                        },
+                                        {
+                                            "label": "All time",
+                                            "value": "all_time",
+                                        },
+                                    ],
+                                    value="12m",
+                                    inline=True,
+                                    className="radio-row compact-toolbar",
                                 ),
+                                dash_table.DataTable(
+                                    id="ratings_table",
 
-                                page_size=30,
+                                    columns=ONE_PAGE_COLUMNS,
 
-                                sort_action="native",
+                                    data=(
+                                        _build_rating_rows(
+                                            "all",
+                                            default_position,
+                                            [],
+                                        )
+                                        if default_position
+                                        else []
+                                    ),
 
-                                style_table={
-                                    **TABLE_STYLE,
-                                    "minWidth": "100%",
-                                },
+                                    page_size=30,
 
-                                style_cell={
-                                    **CELL_STYLE,
-                                    "minWidth": "140px",
-                                    "width": "140px",
-                                },
+                                    sort_action="native",
 
-                                style_header=HEADER_STYLE,
-                            ),
+                                    style_table={
+                                        **TABLE_STYLE,
+                                        "minWidth": "100%",
+                                    },
+
+                                    style_cell={
+                                        **CELL_STYLE,
+                                        "minWidth": "140px",
+                                        "width": "140px",
+                                    },
+
+                                    style_header=HEADER_STYLE,
+                                ),
+                            ],
                         ),
                     ],
                 ),
@@ -1669,44 +1701,62 @@ app.layout = dbc.Container(
                         _section(
                             "Actual Year-on-Year Key Stat Growth",
 
-                            dash_table.DataTable(
-                                id="age_key_stat_growth_table",
-
-                                columns=AGE_GROWTH_BASE_COLUMNS,
-
-                                data=[],
-
-                                page_size=30,
-
-                                sort_action="native",
-
-                                style_table={
-                                    **TABLE_STYLE,
-                                    "minWidth": "100%",
-                                },
-
-                                style_cell={
-                                    **CELL_STYLE,
-                                    "minWidth": "90px",
-                                    "width": "90px",
-                                },
-
-                                style_header=HEADER_STYLE,
-
-                                # Positive / negative changes
-                                # are visually obvious.
-                                style_data_conditional=[
-                                    {
-                                        "if": {
-                                            "filter_query": (
-                                                "{Pac} > 0"
-                                            ),
-                                            "column_id": "Pac",
+                            [
+                                dcc.RadioItems(
+                                    id="key_stats_growth_period",
+                                    options=[
+                                        {
+                                            "label": "Last 12 months",
+                                            "value": "12m",
                                         },
-                                        "color": "#198754",
+                                        {
+                                            "label": "All time",
+                                            "value": "all_time",
+                                        },
+                                    ],
+                                    value="12m",
+                                    inline=True,
+                                    className="radio-row compact-toolbar",
+                                ),
+                                dash_table.DataTable(
+                                    id="age_key_stat_growth_table",
+
+                                    columns=AGE_GROWTH_BASE_COLUMNS,
+
+                                    data=[],
+
+                                    page_size=30,
+
+                                    sort_action="native",
+
+                                    style_table={
+                                        **TABLE_STYLE,
+                                        "minWidth": "100%",
                                     },
-                                ],
-                            ),
+
+                                    style_cell={
+                                        **CELL_STYLE,
+                                        "minWidth": "90px",
+                                        "width": "90px",
+                                    },
+
+                                    style_header=HEADER_STYLE,
+
+                                    # Positive / negative changes
+                                    # are visually obvious.
+                                    style_data_conditional=[
+                                        {
+                                            "if": {
+                                                "filter_query": (
+                                                    "{Pac} > 0"
+                                                ),
+                                                "column_id": "Pac",
+                                            },
+                                            "color": "#198754",
+                                        },
+                                    ],
+                                ),
+                            ],
                         ),
 
                         html.Div(
@@ -1737,6 +1787,10 @@ app.layout = dbc.Container(
         "ratings_table",
         "data",
     ),
+    Output(
+        "ratings_table",
+        "columns",
+    ),
 
     Input(
         "squad_filter",
@@ -1752,21 +1806,39 @@ app.layout = dbc.Container(
         "player_filter",
         "value",
     ),
+    Input(
+        "ratings_growth_period",
+        "value",
+    ),
 )
 def update_ratings_table(
     squad,
     position,
     selected_players,
+    growth_period,
 ):
-
     if not position:
-        return []
+        return [], ONE_PAGE_COLUMNS
 
-    return _build_rating_rows(
+    rows = _build_rating_rows(
         squad or "all",
         position,
         selected_players or [],
+        growth_period or "12m",
     )
+    columns = [
+        {
+            **column,
+            "name": (
+                "Key Stat Growth All Time"
+                if column["id"] == "Key_Stat_Growth"
+                and growth_period == "all_time"
+                else column["name"]
+            ),
+        }
+        for column in ONE_PAGE_COLUMNS
+    ]
+    return rows, columns
 
 
 # ============================================================
@@ -1798,11 +1870,16 @@ def update_ratings_table(
         "player_filter",
         "value",
     ),
+    Input(
+        "key_stats_growth_period",
+        "value",
+    ),
 )
 def update_age_key_stat_growth_table(
     squad,
     position,
     selected_players,
+    growth_period,
 ):
 
     if not position:
@@ -1817,6 +1894,7 @@ def update_age_key_stat_growth_table(
             squad or "all",
             position,
             selected_players or [],
+            growth_period or "12m",
         )
     )
 
